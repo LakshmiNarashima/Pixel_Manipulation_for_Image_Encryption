@@ -1,0 +1,126 @@
+#include <iostream>
+#include <fstream>
+#include <vector>
+
+using namespace std;
+
+// Structure to store RGB values for each pixel
+struct Pixel {
+    unsigned char r, g, b;
+};
+
+// Function to read BMP image file
+vector<Pixel> read_image(const string& filename, int& width, int& height, int& padding) {
+    ifstream file(filename, ios::binary);
+    if (!file) {
+        cerr << "Error: Unable to open file " << filename << endl;
+        return {};
+    }
+
+    // Read BMP file header
+    unsigned char header[54];
+    file.read(reinterpret_cast<char*>(header), sizeof(header));
+
+    // Extract width and height from header
+    width = *reinterpret_cast<int*>(&header[18]);
+    height = *reinterpret_cast<int*>(&header[22]);
+
+    // Calculate padding (BMP rows must be a multiple of 4 bytes)
+    padding = (width * 3) % 4;
+
+    // Allocate memory for image pixels
+    vector<Pixel> pixels(width * height);
+
+    // Read pixel data (consider padding)
+    for (int i = 0; i < height; i++) {
+        file.read(reinterpret_cast<char*>(&pixels[i * width]), sizeof(Pixel) * width);
+        file.ignore(padding);  // Skip padding bytes
+    }
+
+    return pixels;
+}
+
+// Function to write BMP image file
+void write_image(const string& filename, const vector<Pixel>& pixels, int width, int height, int padding) {
+    ofstream file(filename, ios::binary);
+    if (!file) {
+        cerr << "Error: Unable to save file " << filename << endl;
+        return;
+    }
+
+    // Create BMP file header
+    unsigned char header[54] = {
+        0x42, 0x4D, // Signature
+        0, 0, 0, 0, // File size (will be filled later)
+        0, 0, 0, 0, // Reserved
+        54, 0, 0, 0, // Data offset
+        40, 0, 0, 0, // Header size
+        0, 0, 0, 0, // Width
+        0, 0, 0, 0, // Height
+        1, 0, 24, 0, // Planes and bits per pixel
+        0, 0, 0, 0, // Compression
+        0, 0, 0, 0, // Image size
+        0, 0, 0, 0, // Horizontal resolution
+        0, 0, 0, 0, // Vertical resolution
+        0, 0, 0, 0, // Number of colors
+        0, 0, 0, 0  // Important colors
+    };
+
+    // Set width and height in the header
+    *reinterpret_cast<int*>(&header[18]) = width;
+    *reinterpret_cast<int*>(&header[22]) = height;
+
+    // Write header and pixel data with padding
+    file.write(reinterpret_cast<char*>(header), sizeof(header));
+    for (int i = 0; i < height; i++) {
+        file.write(reinterpret_cast<const char*>(&pixels[i * width]), sizeof(Pixel) * width);
+        for (int j = 0; j < padding; j++) {
+            file.put(0);  // Write padding bytes
+        }
+    }
+}
+
+// Function to encrypt or decrypt the image
+void process_image(vector<Pixel>& pixels, int key, bool encrypt) {
+    for (auto& pixel : pixels) {
+        if (encrypt) {
+            pixel.r = (pixel.r + key) % 256;
+            pixel.g = (pixel.g + key) % 256;
+            pixel.b = (pixel.b + key) % 256;
+        } else {
+            pixel.r = (pixel.r - key + 256) % 256;
+            pixel.g = (pixel.g - key + 256) % 256;
+            pixel.b = (pixel.b - key + 256) % 256;
+        }
+    }
+}
+
+int main() {
+    int width, height, padding;
+    const int key = 123;  // Encryption/Decryption key
+    char choice;
+
+    cout << "Simple Image Encryption Tool\nChoose operation (E)ncrypt or (D)ecrypt: ";
+    cin >> choice;
+
+    // Load the image
+    vector<Pixel> image = read_image("input_image.bmp", width, height, padding);
+    if (image.empty()) {
+        return EXIT_FAILURE;
+    }
+
+    // Perform encryption or decryption
+    if (choice == 'E' || choice == 'e') {
+        process_image(image, key, true);
+        write_image("encrypted_image.bmp", image, width, height, padding);
+        cout << "Image encrypted and saved as 'encrypted_image.bmp'." << endl;
+    } else if (choice == 'D' || choice == 'd') {
+        process_image(image, key, false);
+        write_image("decrypted_image.bmp", image, width, height, padding);
+        cout << "Image decrypted and saved as 'decrypted_image.bmp'." << endl;
+    } else {
+        cerr << "Invalid choice. Please choose 'E' or 'D'." << endl;
+    }
+
+    return EXIT_SUCCESS;
+}
