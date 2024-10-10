@@ -55,6 +55,3 @@ Image decrypted and saved as 'decrypted_image.bmp'.
 ## License
 This project is open-source and available for personal or educational use.
 
-```
-
-Feel free to modify any sections as needed!
